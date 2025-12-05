@@ -1,43 +1,23 @@
 name: Build Kernel
 
 on:
-  workflow_dispatch: 
-  pull_request:
-    paths:
-      - '.github/workflows/check-kernel-patches.yml'
-      - '.github/workflows/build.yml'
-      - '.github/workflows/kernel.yml'
-      - 'include/kernel*'
-      - 'package/kernel/**'
-      - 'target/linux/**'
+  workflow_dispatch:
   push:
     paths:
-      - '.github/workflows/check-kernel-patches.yml'
-      - '.github/workflows/build.yml'
-      - '.github/workflows/kernel.yml'
-      - 'include/kernel*'
-      - 'package/kernel/**'
-      - 'target/linux/**'
-    branches-ignore:
-      - master
+      - 'target/linux/mediatek/**'
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   build-kernels:
-    name: Build all affected Kernels
+    name: Build Kernel
     permissions:
       contents: read
       packages: read
       actions: write
-    secrets:
-      ccache_s3_endpoint: ${{ secrets.CCACHE_S3_ENDPOINT }}
-      ccache_s3_bucket: ${{ secrets.CCACHE_S3_BUCKET }}
-      ccache_s3_access_key: ${{ secrets.CCACHE_S3_ACCESS_KEY }}
-      ccache_s3_secret_key: ${{ secrets.CCACHE_S3_SECRET_KEY }}
+    # 這裡就是關鍵修改：直接指定使用 OpenWrt 官方的工具箱，而不是您帳號下的
     uses: openwrt/actions-shared-workflows/.github/workflows/kernel.yml@main
+    with:
+      # 強制指定容器 (Container)，解決紅叉叉問題
+      container_image: ghcr.io/openwrt/buildbot/buildworker-3.10:latest
