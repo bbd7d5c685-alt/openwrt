@@ -1,23 +1,45 @@
-name: Build Kernel
+name: Build WG620443 Firmware
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'target/linux/mediatek/**'
 
 permissions:
   contents: read
 
 jobs:
-  build-kernels:
-    name: Build Kernel
-    permissions:
-      contents: read
-      packages: read
-      actions: write
-    # 這裡就是關鍵修改：直接指定使用 OpenWrt 官方的工具箱，而不是您帳號下的
-    uses: openwrt/actions-shared-workflows/.github/workflows/kernel.yml@main
-    with:
-      # 強制指定容器 (Container)，解決紅叉叉問題
-      container_image: ghcr.io/openwrt/buildbot/buildworker-3.10:latest
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gawk gcc-multilib flex git gettext libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+
+      - name: Update & Install Feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configure Device
+        run: |
+          # 設定目標為 MediaTek Filogic 830 的 WG620443
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_arcadyan_wg620443=y" >> .config
+          # 強制生成 Initramfs 救磚包
+          echo "CONFIG_TARGET_ROOTFS_INITRAMFS=y" >> .config
+          make defconfig
+
+      - name: Build Firmware (This takes time)
+        run: |
+          make download -j$(nproc)
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WG620443-Initramfs
+          path: bin/targets/mediatek/filogic/*initramfs*.bin
