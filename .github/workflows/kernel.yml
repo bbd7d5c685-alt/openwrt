@@ -1,45 +1,41 @@
-name: Build WG620443 Firmware
+name: Build WG620443 Final
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # 強制使用舊版穩定環境，解決兼容性問題
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential gawk gcc-multilib flex git gettext libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
-
-      - name: Update & Install Feeds
+          sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch python3 python2.7 unzip zlib1g-dev lib32gcc-s1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler g++-multilib antlr3 gperf wget
+      
+      - name: Update Feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Configure Device
+      - name: Configure
         run: |
-          # 設定目標為 MediaTek Filogic 830 的 WG620443
           echo "CONFIG_TARGET_mediatek=y" > .config
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_arcadyan_wg620443=y" >> .config
-          # 強制生成 Initramfs 救磚包
           echo "CONFIG_TARGET_ROOTFS_INITRAMFS=y" >> .config
           make defconfig
 
-      - name: Build Firmware (This takes time)
-        run: |
-          make download -j$(nproc)
-          make -j$(nproc) || make -j1 V=s
+      - name: Download Libs
+        run: make download -j8
+
+      - name: Build Firmware
+        run: make -j$(nproc) || make -j1 V=s
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: WG620443-Initramfs
+          name: WG620443-Firmware
           path: bin/targets/mediatek/filogic/*initramfs*.bin
